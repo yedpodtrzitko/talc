@@ -12,8 +12,7 @@ use bevy::prelude::*;
 
 use crate::chunky::async_chunkloader::Chunks;
 use crate::chunky::chunks_refs::ChunkRefs;
-use crate::render::chunk_material::RenderableChunk;
-use crate::{position::ChunkPosition};
+use crate::position::ChunkPosition;
 
 use crate::chunky::{async_chunkloader::AsyncChunkloader, chunk::CHUNK_SIZE_I32};
 
@@ -194,7 +193,7 @@ fn make_offset_vec(diameter: u32) -> Vec<ChunkPosition> {
             }
         }
     }
-    
+
     sampling_offsets.sort_by(|a, b| {
         a.distance_squared(IVec3::ZERO)
             .cmp(&b.distance_squared(IVec3::ZERO))

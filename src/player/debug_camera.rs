@@ -1,6 +1,6 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, PrimaryWindow};
+use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
 pub mod prelude {
     pub use crate::*;
@@ -54,23 +54,19 @@ impl Default for KeyBindings {
 pub struct FlyCam;
 
 /// Grabs/ungrabs mouse cursor
-fn toggle_grab_cursor(window: &mut Window) {
-    if window.cursor_options.grab_mode == CursorGrabMode::None {
-        window.cursor_options.grab_mode = CursorGrabMode::Locked;        
-        window.cursor_options.visible = false;
+fn toggle_grab_cursor(cursor: &mut CursorOptions) {
+    if cursor.grab_mode == CursorGrabMode::None {
+        cursor.grab_mode = CursorGrabMode::Locked;
+        cursor.visible = false;
     } else {
-        window.cursor_options.grab_mode = CursorGrabMode::None;
-        window.cursor_options.visible = true;
+        cursor.grab_mode = CursorGrabMode::None;
+        cursor.visible = true;
     }
 }
 
 /// Grabs the cursor when game first starts
-fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow>>) {
-    if let Ok(mut window) = primary_window.single_mut() {
-        toggle_grab_cursor(&mut window);
-    } else {
-        warn!("Primary window not found for `initial_grab_cursor`!");
-    }
+fn initial_grab_cursor(mut primary_cursor: Single<&mut CursorOptions, With<PrimaryWindow>>) {
+    toggle_grab_cursor(&mut *primary_cursor);
 }
 
 /// Handles keyboard input and movement
@@ -78,43 +74,39 @@ fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow
 fn player_move(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
+    primary_cursor: Single<&CursorOptions, With<PrimaryWindow>>,
     settings: Res<MovementSettings>,
     key_bindings: Res<KeyBindings>,
     mut query: Query<(&FlyCam, &mut Transform)>, //    mut query: Query<&mut Transform, With<FlyCam>>,
 ) {
-    if let Ok(window) = primary_window.single() {
-        for (_camera, mut transform) in &mut query {
-            let mut velocity = Vec3::ZERO;
-            let local_z = transform.local_z();
-            let forward = -Vec3::new(local_z.x, 0., local_z.z);
-            let right = Vec3::new(local_z.z, 0., -local_z.x);
+    for (_camera, mut transform) in &mut query {
+        let mut velocity = Vec3::ZERO;
+        let local_z = transform.local_z();
+        let forward = -Vec3::new(local_z.x, 0., local_z.z);
+        let right = Vec3::new(local_z.z, 0., -local_z.x);
 
-            for key in keys.get_pressed() {
-                if window.cursor_options.grab_mode != CursorGrabMode::None {
-                    let key = *key;
-                    if key == key_bindings.move_forward {
-                        velocity += forward;
-                    } else if key == key_bindings.move_backward {
-                        velocity -= forward;
-                    } else if key == key_bindings.move_left {
-                        velocity -= right;
-                    } else if key == key_bindings.move_right {
-                        velocity += right;
-                    } else if key == key_bindings.move_ascend {
-                        velocity += Vec3::Y;
-                    } else if key == key_bindings.move_descend {
-                        velocity -= Vec3::Y;
-                    }
+        for key in keys.get_pressed() {
+            if primary_cursor.grab_mode != CursorGrabMode::None {
+                let key = *key;
+                if key == key_bindings.move_forward {
+                    velocity += forward;
+                } else if key == key_bindings.move_backward {
+                    velocity -= forward;
+                } else if key == key_bindings.move_left {
+                    velocity -= right;
+                } else if key == key_bindings.move_right {
+                    velocity += right;
+                } else if key == key_bindings.move_ascend {
+                    velocity += Vec3::Y;
+                } else if key == key_bindings.move_descend {
+                    velocity -= Vec3::Y;
                 }
             }
-
-            velocity = velocity.normalize_or_zero();
-
-            transform.translation += velocity * time.delta_secs() * settings.speed;
         }
-    } else {
-        warn!("Primary window not found for `player_move`!");
+
+        velocity = velocity.normalize_or_zero();
+
+        transform.translation += velocity * time.delta_secs() * settings.speed;
     }
 }
 
@@ -122,30 +114,27 @@ fn player_move(
 #[allow(clippy::needless_pass_by_value)]
 fn player_look(
     settings: Res<MovementSettings>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    mut state: EventReader<MouseMotion>,
+    primary_window: Single<&Window, With<PrimaryWindow>>,
+    primary_cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+    mut state: MessageReader<MouseMotion>,
     mut query: Query<&mut Transform, With<FlyCam>>,
 ) {
-    if let Ok(window) = primary_window.single() {
-        for mut transform in &mut query {
-            for ev in state.read() {
-                let (mut yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
-                if window.cursor_options.grab_mode != CursorGrabMode::None {
-                    // Using smallest of height or width ensures equal vertical and horizontal sensitivity
-                    let window_scale = window.height().min(window.width());
-                    pitch -= (settings.sensitivity * ev.delta.y * window_scale).to_radians();
-                    yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
-                }
-
-                pitch = pitch.clamp(-1.54, 1.54);
-
-                // Order is important to prevent unintended roll
-                transform.rotation =
-                    Quat::from_axis_angle(Vec3::Y, yaw) * Quat::from_axis_angle(Vec3::X, pitch);
+    for mut transform in &mut query {
+        for ev in state.read() {
+            let (mut yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            if primary_cursor.grab_mode != CursorGrabMode::None {
+                // Using smallest of height or width ensures equal vertical and horizontal sensitivity
+                let window_scale = primary_window.height().min(primary_window.width());
+                pitch -= (settings.sensitivity * ev.delta.y * window_scale).to_radians();
+                yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
             }
+
+            pitch = pitch.clamp(-1.54, 1.54);
+
+            // Order is important to prevent unintended roll
+            transform.rotation =
+                Quat::from_axis_angle(Vec3::Y, yaw) * Quat::from_axis_angle(Vec3::X, pitch);
         }
-    } else {
-        warn!("Primary window not found for `player_look`!");
     }
 }
 
@@ -153,32 +142,24 @@ fn player_look(
 fn cursor_grab(
     keys: Res<ButtonInput<KeyCode>>,
     key_bindings: Res<KeyBindings>,
-    mut primary_window: Query<&mut Window, With<PrimaryWindow>>,
+    mut primary_cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    if let Ok(mut window) = primary_window.single_mut() {
-        if keys.just_pressed(key_bindings.toggle_grab_cursor) {
-            toggle_grab_cursor(&mut window);
-        }
-    } else {
-        warn!("Primary window not found for `cursor_grab`!");
+    if keys.just_pressed(key_bindings.toggle_grab_cursor) {
+        toggle_grab_cursor(&mut *primary_cursor);
     }
 }
 
 // Grab cursor when an entity with FlyCam is added
 #[allow(clippy::needless_pass_by_value)]
 fn initial_grab_on_flycam_spawn(
-    mut primary_window: Query<&mut Window, With<PrimaryWindow>>,
+    mut primary_cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
     query_added: Query<Entity, Added<FlyCam>>,
 ) {
     if query_added.is_empty() {
         return;
     }
 
-    if let Ok(window) = &mut primary_window.single_mut() {
-        toggle_grab_cursor(window);
-    } else {
-        warn!("Primary window not found for `initial_grab_cursor`!");
-    }
+    toggle_grab_cursor(&mut *primary_cursor);
 }
 
 /// Contains everything needed to add first-person fly camera behavior to your game

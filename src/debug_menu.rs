@@ -3,12 +3,15 @@
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
-    window::{PresentMode, Window, PrimaryWindow},
+    window::{PresentMode, PrimaryWindow, Window},
 };
 
-    use std::time::Duration;
+use std::time::Duration;
 
-    use crate::{chunky::{async_chunkloader::Chunks, chunk::Chunk}, render::chunk_material::RenderableChunk};
+use crate::{
+    chunky::{async_chunkloader::Chunks, chunk::Chunk},
+    render::chunk_material::RenderableChunk,
+};
 
 pub const FONT_SIZE: f32 = 32.;
 pub const FONT_COLOR: Color = Color::WHITE;
@@ -77,7 +80,7 @@ impl FpsCounter {
 
     /// Check if FPS counter is enabled
     pub fn is_enabled(&self) -> bool {
-        !self.timer.paused()
+        !self.timer.is_paused()
     }
 }
 
@@ -92,7 +95,7 @@ fn update(
     mut query: Query<Entity, With<FpsCounterText>>,
     mut writer: TextUiWriter,
     chunk_entities: Res<Chunks>,
-    renderable_chunks: Query<(&Chunk, &RenderableChunk)>
+    renderable_chunks: Query<(&Chunk, &RenderableChunk)>,
 ) {
     let Some(mut state) = state_resources else {
         return;
@@ -100,7 +103,7 @@ fn update(
     if !(state.update_now || state.timer.tick(time.delta()).just_finished()) {
         return;
     }
-    if state.timer.paused() {
+    if state.timer.is_paused() {
         for entity in query.iter_mut() {
             writer.text(entity, 0).clear();
         }
@@ -109,7 +112,14 @@ fn update(
 
         for entity in query.iter_mut() {
             if let Some((fps, frame_time)) = fps_dialog {
-                *writer.text(entity, 0) = format!("{}{:.0}\n{:.1} ms\nloaded chunks: {}\nmeshed chunks: {}", STRING_FORMAT, fps, frame_time, chunk_entities.0.len(), renderable_chunks.iter().len());
+                *writer.text(entity, 0) = format!(
+                    "{}{:.0}\n{:.1} ms\nloaded chunks: {}\nmeshed chunks: {}",
+                    STRING_FORMAT,
+                    fps,
+                    frame_time,
+                    chunk_entities.0.len(),
+                    renderable_chunks.iter().len()
+                );
             } else {
                 *writer.text(entity, 0) = STRING_MISSING.to_string();
             }
@@ -120,15 +130,17 @@ fn update(
 fn extract_fps(diagnostics: &Res<DiagnosticsStore>) -> Option<(f64, f64)> {
     if let Some(fps) = diagnostics
         .get(&FrameTimeDiagnosticsPlugin::FPS)
-        .and_then(|fps| fps.average()) {
+        .and_then(|fps| fps.average())
+    {
         if let Some(frame_time) = diagnostics
             .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
-            .and_then(|frame_time| frame_time.average()) {
+            .and_then(|frame_time| frame_time.average())
+        {
             return Some((fps, frame_time));
         }
     }
 
-    None    
+    None
 }
 
 fn spawn_text(mut commands: Commands) {

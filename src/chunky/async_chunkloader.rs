@@ -1,10 +1,10 @@
 use std::{sync::Arc, vec::Drain};
 
 use bevy::{
+    camera::primitives::Aabb,
     platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::primitives::Aabb,
-    tasks::{block_on, AsyncComputeTaskPool, Task},
+    tasks::{AsyncComputeTaskPool, Task, block_on},
 };
 
 use crate::mod_manager::prototypes::BlockPrototypes;
@@ -182,7 +182,13 @@ fn join_worldgen_threads(
 
         // if this task is done, handle the data it returned!
         if let Some(chunk_component) = status {
-            spawn_chunk_as_bevy_entity(chunk_component, &mut chunk_entities, &timer, &mut commands, chunk_canididates);
+            spawn_chunk_as_bevy_entity(
+                chunk_component,
+                &mut chunk_entities,
+                &timer,
+                &mut commands,
+                chunk_canididates,
+            );
         }
 
         retain

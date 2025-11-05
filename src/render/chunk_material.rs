@@ -10,13 +10,11 @@
 use std::sync::{Arc, OnceLock};
 
 use bevy::{
+    camera::visibility::{VisibilityClass, add_visibility_class},
     prelude::*,
     render::{
-        extract_component::ExtractComponent,
-        render_phase::TrackedRenderPass,
-        render_resource::*,
+        extract_component::ExtractComponent, render_phase::TrackedRenderPass, render_resource::*,
         renderer::RenderDevice,
-        view::{self, VisibilityClass},
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -72,7 +70,7 @@ impl PackedQuad {
             debug_assert!(x_strech < 32, "x strech out of range. expected 0..=31, got {x_strech}");
             debug_assert!(y_strech < 32, "y strech out of range. expected 0..=31, got {y_strech}");
         }
-        
+
         let packed_u32: u32 = x as u32
             | ((y as u32) << 5u32)
             | ((z as u32) << 10u32)
@@ -80,7 +78,7 @@ impl PackedQuad {
             | (ao << 18u32)
             | (x_strech << 20u32)
             | (y_strech << 25u32);
-        
+
         Self { packed_u32, color }
     }
 }
@@ -91,7 +89,7 @@ impl PackedQuad {
 /// that entities with this component need to be examined for visibility.
 #[derive(Clone, Component, ExtractComponent)]
 #[require(VisibilityClass)]
-#[component(on_add = view::add_visibility_class::<RenderableChunk>)]
+#[component(on_add = add_visibility_class::<RenderableChunk>)]
 pub struct RenderableChunk(Arc<ChunkMaterial>);
 
 impl RenderableChunk {
@@ -139,13 +137,13 @@ impl ChunkMaterial {
                 contents: bytemuck::cast_slice(&self.quads),
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
             });
-            
+
             let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
                 label: Some("chunk uniform buffer"),
                 contents: bytemuck::cast_slice(&self.chunk_position.to_array()),
                 usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             });
-            
+
             let uniform_bind_group = render_device.create_bind_group(
                 Some("chunk bind group"),
                 &bind_group_layout(render_device),
@@ -186,7 +184,7 @@ impl ChunkMaterial {
         render_pass.set_vertex_buffer(0, simple_quad_index_buffer.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
         render_pass.set_bind_group(1, &uniform_bind_group, &[]);
-        
+
         render_pass.draw_indexed(
             0..simple_quad_index_buffer.length,
             0,

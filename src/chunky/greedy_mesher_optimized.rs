@@ -1,10 +1,10 @@
 use bevy::{platform::collections::HashMap, prelude::*};
 
 use crate::{
+    chunky::chunk::access_block_registry,
     mod_manager::prototypes::BlockPrototype,
     position::Position,
     render::chunk_material::{PackedQuad, RenderableChunk},
-    chunky::chunk::access_block_registry,
 };
 
 use super::{
@@ -214,7 +214,8 @@ pub fn build_chunk_instance_data(chunks_refs: &ChunkRefs, lod: Lod) -> Option<Re
         for (block_ao, axis_plane) in block_ao_data {
             let ao = block_ao & 0b111111111;
             let block_id = (block_ao >> 9) as u16;
-            let block_prototype = access_block_registry(block_id).expect("Invalid block id in greedy mesher.");
+            let block_prototype =
+                access_block_registry(block_id).expect("Invalid block id in greedy mesher.");
             let srgba = block_prototype.color.to_srgba();
             let r = (srgba.red * 255.0) as u32;
             let g = (srgba.green * 255.0) as u32;

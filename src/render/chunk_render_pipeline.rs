@@ -1,25 +1,33 @@
 use bevy::{
-    core_pipeline::core_3d::{Transparent3d, CORE_3D_DEPTH_FORMAT},
+    core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Transparent3d},
     ecs::system::{
-        lifetimeless::{Read, SRes}, SystemParamItem
+        SystemParamItem,
+        lifetimeless::{Read, SRes},
     },
     pbr::{MeshPipeline, MeshPipelineKey, MeshPipelineViewLayoutKey, SetMeshViewBindGroup},
     prelude::*,
     render::{
-        extract_component::ExtractComponentPlugin, mesh::{PrimitiveTopology, VertexBufferLayout}, render_phase::{
+        Render, RenderApp, RenderSystems,
+        extract_component::ExtractComponentPlugin,
+        render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
             RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-        }, render_resource::{
+        },
+        render_resource::{
             BindGroupLayout, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
-            Face, FragmentState, MultisampleState, PipelineCache, PolygonMode,
-            PrimitiveState, RenderPipelineDescriptor, SpecializedRenderPipeline,
+            Face, FragmentState, MultisampleState, PipelineCache, PolygonMode, PrimitiveState,
+            PrimitiveTopology, RenderPipelineDescriptor, SpecializedRenderPipeline,
             SpecializedRenderPipelines, TextureFormat, VertexAttribute, VertexFormat, VertexState,
             VertexStepMode,
-        }, renderer::RenderDevice, sync_world::MainEntity, view::{ExtractedView, RenderVisibleEntities, ViewTarget}, Render, RenderApp, RenderSystems
+        },
+        renderer::RenderDevice,
+        sync_world::MainEntity,
+        view::{ExtractedView, RenderVisibleEntities, ViewTarget},
     },
 };
+use bevy_mesh::VertexBufferLayout;
 
-use super::chunk_material::{RenderableChunk, bind_group_layout, PackedQuad};
+use super::chunk_material::{PackedQuad, RenderableChunk, bind_group_layout};
 
 const SHADER_ASSET_PATH: &str = "shaders/chunk.wgsl";
 
@@ -85,7 +93,8 @@ fn queue_custom_render_pipeline(
 
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
-        for (render_entity, visible_entity, renderable_chunk) in &material_meshes // TODO: frustrum culling. see https://github.com/bevyengine/bevy/blob/19ee692f9621f89f305096f423507e925b748b9a/examples/shader/specialized_mesh_pipeline.rs#L353
+        for (render_entity, visible_entity, renderable_chunk) in &material_meshes
+        // TODO: frustrum culling. see https://github.com/bevyengine/bevy/blob/19ee692f9621f89f305096f423507e925b748b9a/examples/shader/specialized_mesh_pipeline.rs#L353
         {
             // Specialize the key for the current mesh entity
             // For this example we only specialize based on the mesh topology
@@ -101,7 +110,9 @@ fn queue_custom_render_pipeline(
                 entity: (render_entity, *visible_entity),
                 pipeline,
                 draw_function: draw_custom,
-                distance: rangefinder.distance_translation(&renderable_chunk.chunk_position().map(|x| x * 32).as_vec3()),
+                distance: rangefinder.distance_translation(
+                    &renderable_chunk.chunk_position().map(|x| x * 32).as_vec3(),
+                ),
                 batch_range: 0..1,
                 extra_index: PhaseItemExtraIndex::None,
                 indexed: true,
@@ -150,13 +161,11 @@ impl SpecializedRenderPipeline for CustomPipeline {
         let vertex_buffer_layout = VertexBufferLayout {
             array_stride: std::mem::size_of::<[f32; 3]>() as u64,
             step_mode: VertexStepMode::Vertex,
-            attributes: vec![
-                VertexAttribute {
-                    format: VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 0,
-                }
-            ],
+            attributes: vec![VertexAttribute {
+                format: VertexFormat::Float32x3,
+                offset: 0,
+                shader_location: 0,
+            }],
         };
 
         let instance_buffer_layout = VertexBufferLayout {
@@ -175,13 +184,14 @@ impl SpecializedRenderPipeline for CustomPipeline {
                 },
             ],
         };
-        
+
         RenderPipelineDescriptor {
             label: Some("Specialized Mesh Pipeline".into()),
             layout: vec![
                 // Bind group 0 is the view uniform
                 self.mesh_pipeline
                     .get_view_layout(MeshPipelineViewLayoutKey::from(key))
+                    .main_layout
                     .clone(),
                 // Bind group 1 is the chunk position.
                 self.bind_group_layout.clone(),
@@ -190,14 +200,14 @@ impl SpecializedRenderPipeline for CustomPipeline {
             vertex: VertexState {
                 shader: self.shader_handle.clone(),
                 shader_defs: vec![],
-                entry_point: "vertex".into(),
+                entry_point: Some("vertex".into()),
                 // Customize how to store the meshes' vertex attributes in the vertex buffer
                 buffers: vec![vertex_buffer_layout, instance_buffer_layout],
             },
             fragment: Some(FragmentState {
                 shader: self.shader_handle.clone(),
                 shader_defs: vec![],
-                entry_point: "fragment".into(),
+                entry_point: Some("fragment".into()),
                 targets: vec![Some(ColorTargetState {
                     // This isn't required, but bevy supports HDR and non-HDR rendering
                     // so it's generally recommended to specialize the pipeline for that

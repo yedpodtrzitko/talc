@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::{
     app::TaskPoolThreadAssignmentPolicy,
-    core_pipeline::bloom::Bloom,
     pbr::{Atmosphere, AtmosphereSettings},
     render::{
         RenderPlugin,
@@ -85,10 +85,7 @@ pub fn setup(
             Transform::from_xyz(0.0, 200.0, 0.5),
             Camera3d::default(),
             FlyCam,
-            Camera {
-                hdr: true,
-                ..default()
-            },
+            Camera::default(),
             Atmosphere {
                 bottom_radius: 5_000.0,
                 top_radius: 64_600.0 * 3.,
